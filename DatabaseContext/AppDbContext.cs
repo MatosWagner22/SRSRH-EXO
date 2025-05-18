@@ -19,11 +19,27 @@ namespace SRSRH_EXO.DatabaseContext
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // Configuración de relaciones
+            // Configuración de relaciones many-to-many
             modelBuilder.Entity<Candidato>()
-                .HasMany(c => c.Experiencias)
-                .WithOne(e => e.Candidato)
-                .OnDelete(DeleteBehavior.Cascade);
+                .HasMany(c => c.Competencias)
+                .WithMany(c => c.Candidatos)
+                .UsingEntity(j => j.ToTable("CandidatoCompetencias"));
+
+            modelBuilder.Entity<Candidato>()
+                .HasMany(c => c.Idiomas)
+                .WithMany(i => i.Candidatos)
+                .UsingEntity(j => j.ToTable("CandidatoIdiomas"));
+
+            modelBuilder.Entity<Candidato>()
+                .HasMany(c => c.Capacitaciones)
+                .WithMany(c => c.Candidatos)
+                .UsingEntity(j => j.ToTable("CandidatoCapacitaciones"));
+
+            // Configuración de relación one-to-many
+            modelBuilder.Entity<ExperienciaLaboral>()
+                .HasOne(e => e.Candidato)
+                .WithMany(c => c.Experiencias)
+                .HasForeignKey(e => e.CandidatoId);
         }
     }
 }

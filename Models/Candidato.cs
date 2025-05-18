@@ -18,10 +18,12 @@ namespace SRSRH_EXO.Models
 
         public decimal SalarioAspirado { get; set; }
 
-        public List<Competencia> Competencias { get; set; }
-        public List<Idioma> Idiomas { get; set; }
-        public List<Capacitacion> Capacitaciones { get; set; }
-        public List<ExperienciaLaboral> Experiencias { get; set; }
+        public List<Competencia> Competencias { get; set; } = new List<Competencia>();
+        public List<Idioma> Idiomas { get; set; } = new List<Idioma>();
+        public List<Capacitacion> Capacitaciones { get; set; } = new List<Capacitacion>();
+
+        // Relación one-to-many
+        public List<ExperienciaLaboral> Experiencias { get; set; } = new List<ExperienciaLaboral>();
         public string RecomendadoPor { get; set; }
     }
 }
