@@ -1,0 +1,6 @@
+@SRSRH_EXO_HostAddress = http://localhost:5170
+
+GET {{SRSRH_EXO_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
