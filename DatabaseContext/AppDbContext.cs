@@ -40,6 +40,18 @@ namespace SRSRH_EXO.DatabaseContext
                 .HasOne(e => e.Candidato)
                 .WithMany(c => c.Experiencias)
                 .HasForeignKey(e => e.CandidatoId);
+
+            // Relación Puesto -> Candidatos (1 a muchos)
+            modelBuilder.Entity<Candidato>()
+                .HasOne(c => c.Puesto)
+                .WithMany(p => p.Candidatos)
+                .HasForeignKey(c => c.PuestoId);
+
+            // Relación Puesto -> Empleados (1 a muchos)
+            modelBuilder.Entity<Empleado>()
+                .HasOne(e => e.Puesto)
+                .WithMany(p => p.Empleados)
+                .HasForeignKey(e => e.PuestoId);
         }
     }
 }

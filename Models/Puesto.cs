@@ -16,5 +16,7 @@ namespace SRSRH_EXO.Models
         public decimal SalarioMaximo { get; set; }
 
         public bool Estado { get; set; } = true;
+        public List<Candidato> Candidatos { get; set; } = new List<Candidato>();
+        public List<Empleado> Empleados { get; set; } = new List<Empleado>();
     }
 }

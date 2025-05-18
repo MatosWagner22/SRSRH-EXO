@@ -2,6 +2,9 @@
 using Microsoft.EntityFrameworkCore;
 using SRSRH_EXO.DatabaseContext;
 using SRSRH_EXO.Models;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+using SRSRH_EXO.DTOs;
 
 namespace SRSRH_EXO.Controllers
 {
@@ -11,51 +14,128 @@ namespace SRSRH_EXO.Controllers
     {
         private readonly AppDbContext _context;
 
-        public EmpleadosController(AppDbContext context) => _context = context;
+        public EmpleadosController(AppDbContext context)
+        {
+            _context = context;
+        }
 
         // GET: api/Empleados
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Empleado>>> GetEmpleados()
-            => await _context.Empleados
-                .Include(e => e.Puesto)
-                .ToListAsync();
-
-        // PUT: api/Empleados/5 (Actualizar estado)
-        [HttpPut("{id}/estado")]
-        public async Task<IActionResult> UpdateEstado(int id, [FromBody] string estado)
+        public async Task<ActionResult<IEnumerable<EmpleadoDto>>> GetEmpleados()
         {
-            var empleado = await _context.Empleados.FindAsync(id);
-            if (empleado == null) return NotFound();
-
-            if (estado != "Activo" && estado != "Inactivo")
-                return BadRequest("Estado debe ser 'Activo' o 'Inactivo'");
-
-            empleado.Estado = estado;
-            await _context.SaveChangesAsync();
-            return NoContent();
+            return await _context.Empleados
+                .Include(e => e.Puesto)
+                .Select(e => MapToDto(e))
+                .ToListAsync();
         }
 
         // GET: api/Empleados/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Empleado>> GetEmpleado(int id)
+        public async Task<ActionResult<EmpleadoDto>> GetEmpleado(int id)
         {
             var empleado = await _context.Empleados
                 .Include(e => e.Puesto)
                 .FirstOrDefaultAsync(e => e.Id == id);
 
-            return empleado ?? (ActionResult<Empleado>)NotFound();
+            if (empleado == null)
+            {
+                return NotFound();
+            }
+
+            return MapToDto(empleado);
         }
 
-        // DELETE: api/Empleados/5 (Baja lógica)
+        // PUT: api/Empleados/5
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutEmpleado(int id, EmpleadoUpdateDto dto)
+        {
+            if (id != dto.Id)
+            {
+                return BadRequest("ID del empleado no coincide");
+            }
+
+            var empleado = await _context.Empleados.FindAsync(id);
+            if (empleado == null)
+            {
+                return NotFound();
+            }
+
+            // Validar puesto
+            if (!await _context.Puestos.AnyAsync(p => p.Id == dto.PuestoId))
+            {
+                return BadRequest("El puesto especificado no existe");
+            }
+
+            // Validar salario
+            var puesto = await _context.Puestos.FindAsync(dto.PuestoId);
+            if (dto.SalarioMensual < puesto.SalarioMinimo || dto.SalarioMensual > puesto.SalarioMaximo)
+            {
+                return BadRequest($"El salario debe estar entre {puesto.SalarioMinimo} y {puesto.SalarioMaximo}");
+            }
+
+            empleado.Nombre = dto.Nombre;
+            empleado.PuestoId = dto.PuestoId;
+            empleado.Departamento = dto.Departamento;
+            empleado.SalarioMensual = dto.SalarioMensual;
+            empleado.Estado = dto.Estado;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!EmpleadoExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        // DELETE: api/Empleados/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteEmpleado(int id)
         {
             var empleado = await _context.Empleados.FindAsync(id);
-            if (empleado == null) return NotFound();
+            if (empleado == null)
+            {
+                return NotFound();
+            }
 
+            // Marcar como inactivo en lugar de eliminar
             empleado.Estado = "Inactivo";
             await _context.SaveChangesAsync();
+
             return NoContent();
         }
+
+        private bool EmpleadoExists(int id)
+        {
+            return _context.Empleados.Any(e => e.Id == id);
+        }
+
+        private static EmpleadoDto MapToDto(Empleado empleado)
+        {
+            return new EmpleadoDto
+            {
+                Id = empleado.Id,
+                Cedula = empleado.Cedula,
+                Nombre = empleado.Nombre,
+                FechaIngreso = empleado.FechaIngreso,
+                Departamento = empleado.Departamento,
+                PuestoId = empleado.PuestoId,
+                PuestoNombre = empleado.Puesto?.Nombre,
+                SalarioMensual = empleado.SalarioMensual,
+                Estado = empleado.Estado
+            };
+        }
     }
+
+    
 }
