@@ -30,7 +30,7 @@ namespace SRSRH_EXO.Controllers
                 .Select(c => MapToDto(c))
                 .ToListAsync();
         }
-
+            
         // GET: api/Candidatos/5
         [HttpGet("{id}")]
         public async Task<ActionResult<CandidatoDto>> GetCandidato(int id)
@@ -188,6 +188,127 @@ namespace SRSRH_EXO.Controllers
                     candidato.Experiencias.Add(experiencia);
                 }
             }
+        }
+
+        [HttpPost("{id}/ConvertirAEmpleado")]
+        public async Task<ActionResult<EmpleadoDto>> ConvertirCandidatoAEmpleado(int id)
+        {
+            // Obtener el candidato con sus relaciones
+            var candidato = await _context.Candidatos
+                .Include(c => c.Puesto)
+                .Include(c => c.Competencias)
+                .Include(c => c.Idiomas)
+                .Include(c => c.Capacitaciones)
+                .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (candidato == null)
+            {
+                return NotFound();
+            }
+
+            // Validar que el candidato tenga un puesto asignado
+            if (candidato.Puesto == null)
+            {
+                return BadRequest("El candidato no tiene un puesto asignado");
+            }
+
+            // Crear el empleado a partir del candidato
+            var empleado = new Empleado
+            {
+                Cedula = candidato.Cedula,
+                Nombre = candidato.Nombre,
+                PuestoId = candidato.PuestoId,
+                Departamento = candidato.Departamento,
+                SalarioMensual = candidato.SalarioAspirado,
+                Estado = "Activo",
+                FechaIngreso = DateTime.Now
+            };
+
+            // Validar salario con el puesto
+            if (empleado.SalarioMensual < candidato.Puesto.SalarioMinimo ||
+                empleado.SalarioMensual > candidato.Puesto.SalarioMaximo)
+            {
+                return BadRequest($"El salario aspirado ({empleado.SalarioMensual}) no está dentro del rango del puesto ({candidato.Puesto.SalarioMinimo} - {candidato.Puesto.SalarioMaximo})");
+            }
+
+            // Agregar el empleado
+            _context.Empleados.Add(empleado);
+
+            // Eliminar el candidato
+            _context.Candidatos.Remove(candidato);
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                return StatusCode(500, "Error al convertir el candidato en empleado: " + ex.InnerException?.Message ?? ex.Message);
+            }
+
+            // Cargar datos relacionados para el DTO
+            await _context.Entry(empleado).Reference(e => e.Puesto).LoadAsync();
+
+            return CreatedAtAction(nameof(EmpleadosController.GetEmpleado),
+                "Empleados",
+                new { id = empleado.Id },
+                MapToEmpleadoDto(empleado));
+        }
+
+        // GET: api/Candidatos/filtro
+        [HttpGet("filtro")]
+        public async Task<ActionResult<IEnumerable<CandidatoDto>>> GetCandidatosFiltrados(
+            [FromQuery] int? puestoId,
+            [FromQuery] int? competenciaId,
+            [FromQuery] int? idiomaId,
+            [FromQuery] int? capacitacionId)
+        {
+            var query = _context.Candidatos
+                .Include(c => c.Puesto)
+                .Include(c => c.Competencias)
+                .Include(c => c.Idiomas)
+                .Include(c => c.Capacitaciones)
+                .AsQueryable();
+
+            // Aplicar filtros
+            if (puestoId.HasValue)
+            {
+                query = query.Where(c => c.PuestoId == puestoId.Value);
+            }
+
+            if (competenciaId.HasValue)
+            {
+                query = query.Where(c => c.Competencias.Any(comp => comp.Id == competenciaId.Value));
+            }
+
+            if (idiomaId.HasValue)
+            {
+                query = query.Where(c => c.Idiomas.Any(i => i.Id == idiomaId.Value));
+            }
+
+            if (capacitacionId.HasValue)
+            {
+                query = query.Where(c => c.Capacitaciones.Any(cap => cap.Id == capacitacionId.Value));
+            }
+
+            var candidatos = await query.ToListAsync();
+            return candidatos.Select(c => MapToDto(c)).ToList();
+        }
+
+        private static EmpleadoDto MapToEmpleadoDto(Empleado empleado)
+        {
+            return new EmpleadoDto
+            {
+                Id = empleado.Id,
+                Cedula = empleado.Cedula,
+                Nombre = empleado.Nombre,
+                FechaIngreso = empleado.FechaIngreso,
+                Departamento = empleado.Departamento,
+                PuestoId = empleado.PuestoId,
+                PuestoNombre = empleado.Puesto?.Nombre,
+                SalarioMensual = empleado.SalarioMensual,
+                Estado = empleado.Estado
+            };
         }
 
         private static CandidatoDto MapToDto(Candidato candidato)

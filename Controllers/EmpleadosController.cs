@@ -45,6 +45,44 @@ namespace SRSRH_EXO.Controllers
             return MapToDto(empleado);
         }
 
+        [HttpPost]
+        public async Task<ActionResult<EmpleadoDto>> PostEmpleado(EmpleadoCreateDto dto)
+        {
+            // Validar puesto
+            var puesto = await _context.Puestos.FindAsync(dto.PuestoId);
+            if (puesto == null)
+            {
+                return BadRequest("El puesto especificado no existe");
+            }
+
+            // Validar salario
+            if (dto.SalarioMensual < puesto.SalarioMinimo || dto.SalarioMensual > puesto.SalarioMaximo)
+            {
+                return BadRequest($"El salario debe estar entre {puesto.SalarioMinimo} y {puesto.SalarioMaximo}");
+            }
+
+            // Crear nuevo empleado
+            var empleado = new Empleado
+            {
+                Cedula = dto.Cedula,
+                Nombre = dto.Nombre,
+                PuestoId = dto.PuestoId,
+                Departamento = dto.Departamento,
+                SalarioMensual = dto.SalarioMensual,
+                Estado = dto.Estado,
+                FechaIngreso = DateTime.Now
+            };
+
+            _context.Empleados.Add(empleado);
+            await _context.SaveChangesAsync();
+
+            // Cargar datos relacionados para el DTO
+            await _context.Entry(empleado).Reference(e => e.Puesto).LoadAsync();
+
+            return CreatedAtAction("GetEmpleado", new { id = empleado.Id }, MapToDto(empleado));
+        }
+
+
         // PUT: api/Empleados/5
         [HttpPut("{id}")]
         public async Task<IActionResult> PutEmpleado(int id, EmpleadoUpdateDto dto)
